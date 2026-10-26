@@ -16,13 +16,28 @@
 # Everything below was executed locally in these exact images before being
 # committed. See docs/spark-proposals/bodies.md and .hermes/evidence/ for the
 # captured output.
+#
+# Both jobs run on every push to dev and master, and on every PR targeting
+# either. There is no per-branch variation: the gate is the gate.
 
 name: CI
 
+# Branch flow:
+#
+#   dev     integration branch. Every push runs the full pipeline, so a broken
+#           proof or a broken build is caught within one commit of arriving.
+#   master  release branch. Pushes run the same pipeline; it is normally
+#           reached only by merging dev, so a green master means the merge
+#           preserved both the proofs and the build.
+#
+# `pull_request` is unfiltered on purpose: a PR from dev to master must run the
+# gate before the merge, and a PR from a throwaway branch should also get
+# feedback rather than being merged blind.
 on:
   push:
-    branches: [master]
+    branches: [dev, master]
   pull_request:
+    branches: [dev, master]
   workflow_dispatch:
 
 env:
