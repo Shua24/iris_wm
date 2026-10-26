@@ -1,7 +1,12 @@
 with "config/iris_wm_config.gpr";
 project Iris_Wm is
 
-   for Source_Dirs use ("src/", "config/");
+   --  GPR source directories are not recursive, so every package directory is
+   --  listed explicitly. One directory per architectural layer:
+   --    src/               the main procedure
+   --    src/iris/wlroots/  the thin binding to wlroots and libwayland
+   --    src/iris/          compositor policy, ordinary Ada
+   for Source_Dirs use ("src/", "src/iris/", "src/iris/wlroots/", "config/");
    for Object_Dir use "obj/" & Iris_Wm_Config.Build_Profile;
    for Create_Missing_Dirs use "True";
    for Exec_Dir use "bin";
@@ -9,7 +14,20 @@ project Iris_Wm is
 
    package Compiler is
       for Default_Switches ("Ada") use Iris_Wm_Config.Ada_Compiler_Switches;
+
+      --  Only relevant if a C source is ever added to this project. The define
+      --  is mandatory for every wlroots header and is NOT carried by
+      --  wlroots-0.20.pc, so it is stated here rather than assumed.
+      for Default_Switches ("C") use ("-DWLR_USE_UNSTABLE");
    end Compiler;
+
+   --  Linker switches belong to the project that links: a `package Linker` does
+   --  not propagate across `with` imports, and GPR `Linker_Options` is silently
+   --  ignored. This is the one place that works for an executable.
+   package Linker is
+      for Default_Switches ("Ada") use
+        ("-lwlroots-0.20", "-lwayland-server", "-lwayland-client", "-lm");
+   end Linker;
 
    package Binder is
       for Switches ("Ada") use ("-Es"); --  Symbolic traceback

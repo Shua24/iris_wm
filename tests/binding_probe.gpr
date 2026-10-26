@@ -1,0 +1,40 @@
+--  Builds the binding probe and the AUnit suite against the real project
+--  sources.
+--
+--  It is a separate project because iris_wm.gpr declares a single main, and
+--  adding test mains to it would ship them in the compositor's build. The
+--  source directories are shared, so the probe compiles exactly the packages
+--  the compositor links.
+--
+--  Build from the repository root, after at least one `alr build` has
+--  generated config/:
+--
+--    alr exec -- gprbuild -P tests/binding_probe.gpr
+--    DISPLAY=:1 ./bin/binding_probe
+--    WLR_BACKENDS=headless ./bin/binding_probe
+
+with "../config/iris_wm_config.gpr";
+
+project Binding_Probe is
+
+   for Source_Dirs use
+     ("../src/iris/", "../src/iris/wlroots/", ".", "../config/");
+   for Object_Dir use "../obj/" & Iris_Wm_Config.Build_Profile & "/tests";
+   for Create_Missing_Dirs use "True";
+   for Exec_Dir use "../bin";
+   for Main use ("binding_probe.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use Iris_Wm_Config.Ada_Compiler_Switches;
+   end Compiler;
+
+   package Linker is
+      for Default_Switches ("Ada") use
+        ("-lwlroots-0.20", "-lwayland-server", "-lwayland-client", "-lm");
+   end Linker;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es");
+   end Binder;
+
+end Binding_Probe;
