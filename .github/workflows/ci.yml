@@ -1,0 +1,143 @@
+# Iris CI
+#
+# Two jobs with deliberately different images, because they need different
+# things and coupling them would let one break the other:
+#
+#   proof           the v0 gate. The SPARK core is pure Ada arithmetic: no
+#                   wlroots, no Wayland, no GPU. It runs on Alire's own GNAT
+#                   image, which ships GNAT and gprbuild preinstalled, so the
+#                   only thing to install is gnatprove.
+#
+#   build-and-test  needs wlroots 0.20 headers, which no Ubuntu release carries
+#                   (Ubuntu 26.04 LTS still ships wlroots 0.19). It therefore
+#                   runs on the pinned debian:experimental image, which has
+#                   0.20.2.
+#
+# Everything below was executed locally in these exact images before being
+# committed. See docs/spark-proposals/bodies.md and .hermes/evidence/ for the
+# captured output.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # Alire's own toolchain image. Ships GNAT 14.3.0 and gprbuild, so no toolchain
+  # download is needed. Pinned by digest; the tag is what the pin was resolved
+  # from on 2026-10-26.
+  ALIRE_GNAT_IMAGE: ghcr.io/alire-project/docker/gnat:ubuntu-lts@sha256:dbdfa28f90dcca2f87dd3d7f32dbec8d2ccaed13bbb707cc65962e19c75571fe
+
+  # Pinned by digest, not by tag: debian:experimental is a rolling tag and
+  # Debian removes packages from experimental, so a tag reference would break
+  # one day with no code change. Verified 2026-10-26 to ship
+  # libwlroots-0.20-dev 0.20.2-1 — note the original plan expected 0.20.0-1 and
+  # treated CI as the older environment; that is no longer true.
+  DEBIAN_EXPERIMENTAL_IMAGE: debian:experimental@sha256:eb3b582e76764e6d0f4f8281245e51d0defbe2537504144803772308b705b405
+
+  ALIRE_VERSION: "2.1.1"
+  GNATPROVE_VERSION: "16.1.0"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The v0 gate. If this job is not green, v0 is not done, regardless of
+  # whether the compositor builds or runs.
+  # ---------------------------------------------------------------------------
+  proof:
+    name: SPARK proofs (v0 gate)
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/alire-project/docker/gnat:ubuntu-lts@sha256:dbdfa28f90dcca2f87dd3d7f32dbec8d2ccaed13bbb707cc65962e19c75571fe
+      options: --user root
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Alire and gnatprove
+        run: |
+          DEBIAN_FRONTEND=noninteractive apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            --no-install-recommends ca-certificates curl unzip
+          curl -sSL -o /tmp/alr.zip \
+            "https://github.com/alire-project/alire/releases/download/v${ALIRE_VERSION}/alr-${ALIRE_VERSION}-bin-x86_64-linux.zip"
+          unzip -q /tmp/alr.zip -d /opt
+          ln -s /opt/bin/alr /usr/local/bin/alr
+          alr --version
+          alr index --update-all
+          # gnatprove is verification-only tooling and is deliberately NOT in
+          # alire.toml. It is installed here, pinned, and never linked.
+          alr install "gnatprove=${GNATPROVE_VERSION}"
+
+      - name: Prove the SPARK core
+        run: |
+          # scripts/prove.sh locates gnatprove (it lands in ~/.alire/bin, which
+          # is not on PATH), runs it with --proof=per_check:all, and asserts on
+          # the check table rather than the exit status. A vacuous run exits 0
+          # and proves nothing; the script fails on that.
+          ./scripts/prove.sh
+
+      - name: Upload the proof summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gnatprove-summary
+          path: |
+            obj/spark/gnatprove/gnatprove.out
+            obj/spark-gnatprove.log
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # The compositor. Needs wlroots 0.20 headers.
+  # ---------------------------------------------------------------------------
+  build-and-test:
+    name: build and probe
+    runs-on: ubuntu-latest
+    container:
+      image: debian:experimental@sha256:eb3b582e76764e6d0f4f8281245e51d0defbe2537504144803772308b705b405
+      options: --user root
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wlroots and build dependencies
+        run: |
+          apt-get update -qq
+          # -t experimental because the package lives in the experimental
+          # overlay even though the base image is experimental.
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            -t experimental --no-install-recommends \
+            libwlroots-0.20-dev libwayland-dev \
+            pkg-config build-essential ca-certificates curl unzip git
+          pkg-config --modversion wlroots-0.20
+
+      - name: Install Alire and the Ada toolchain
+        run: |
+          curl -sSL -o /tmp/alr.zip \
+            "https://github.com/alire-project/alire/releases/download/v${ALIRE_VERSION}/alr-${ALIRE_VERSION}-bin-x86_64-linux.zip"
+          unzip -q /tmp/alr.zip -d /opt
+          ln -s /opt/bin/alr /usr/local/bin/alr
+          alr --version
+          alr index --update-all
+          alr toolchain --select gnat_native=16.1.0 gprbuild=26.0.1
+
+      - name: Build the compositor
+        run: alr build
+
+      - name: Build the probes
+        run: alr exec -- gprbuild -P tests/binding_probe.gpr
+
+      - name: Binding probe
+        run: WLR_BACKENDS=headless ./bin/binding_probe
+
+      - name: Lifetime test
+        run: WLR_BACKENDS=headless ./bin/lifetime_test
+
+      - name: Init check (real client connects)
+        run: WLR_BACKENDS=headless ./scripts/init-check.sh
+
+      # No GPU in a container, so the DRM path cannot be exercised here at all.
+      # scripts/drm-check.sh (task D5) is the substitute, run by hand on real
+      # hardware. Do not add a DRM step to this job and call it coverage.

@@ -13,3 +13,7 @@
 # Editor and tooling noise
 *~
 *.swp
+
+# GNAT artifacts from one-off -gnatc checks outside the object dir
+/*.ali
+/*.o
