@@ -38,6 +38,19 @@
 --  after it.
 --
 --  ---------------------------------------------------------------------------
+--  Signal handling
+--  ---------------------------------------------------------------------------
+--
+--  Start installs handlers for SIGINT and SIGTERM on the event loop. They do
+--  one thing: ask the loop to return. Teardown then happens in Finish, on the
+--  normal path, because destroying objects from inside a signal callback means
+--  destroying them while the loop is still iterating over them.
+--
+--  This is not a nicety. Without it, SIGTERM kills the process by default
+--  action, and on real hardware that means the DRM backend never releases the
+--  VT: the machine is left on a dead console with no way back to the session.
+--
+--  ---------------------------------------------------------------------------
 --  What this package does not do yet
 --  ---------------------------------------------------------------------------
 --
@@ -59,7 +72,8 @@ package Iris.Server is
    --  compiler, and the order above cannot survive that.
 
    type Startup_Result is (Succeeded, Display_Unavailable,
-                           Event_Loop_Unavailable, Backend_Unavailable);
+                           Event_Loop_Unavailable, Backend_Unavailable,
+                           Signal_Handler_Unavailable);
 
    function Start (Server : in out Instance) return Startup_Result;
    --  Creates the display and autocreates the backend. Returns the first thing
@@ -95,10 +109,12 @@ package Iris.Server is
 private
 
    type Instance is tagged limited record
-      Display    : Opaque_Pointer := No_Pointer;
-      Event_Loop : Opaque_Pointer := No_Pointer;
-      Backend    : Opaque_Pointer := No_Pointer;
-      Running    : Boolean := False;
+      Display      : Opaque_Pointer := No_Pointer;
+      Event_Loop   : Opaque_Pointer := No_Pointer;
+      Backend      : Opaque_Pointer := No_Pointer;
+      Sigint_Source  : Opaque_Pointer := No_Pointer;
+      Sigterm_Source : Opaque_Pointer := No_Pointer;
+      Running      : Boolean := False;
    end record;
 
 end Iris.Server;
