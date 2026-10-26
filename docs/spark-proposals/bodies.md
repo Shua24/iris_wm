@@ -90,7 +90,7 @@ medium: postcondition might fail                <-- wrong body rejected
 Both produce two functional contracts. **The check count does not distinguish them.** Only
 a wrong body does.
 
-### 2.2 The clauses to use
+### 2.2 The clauses to use (done)
 
 ```ada
    function Contains (Outer : Rectangle; Inner : Rectangle) return Boolean
