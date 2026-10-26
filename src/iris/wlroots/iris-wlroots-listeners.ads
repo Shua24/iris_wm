@@ -115,7 +115,7 @@ package Iris.Wlroots.Listeners is
    --  Equivalent to wl_signal_init: an empty signal points at itself.
 
    procedure Signal_Add
-     (Signal   : aliased in out Wl_Signal;
+     (Signal   : aliased in Wl_Signal;
       Listener : aliased in out Wl_Listener);
    --  Equivalent to wl_signal_add, which cannot be linked:
    --     wl_list_insert (Signal.Listener_List.Prev, &Listener.Link);
@@ -173,7 +173,7 @@ package Iris.Wlroots.Listeners is
 
    procedure Attach
      (Item   : aliased in out Registration;
-      Signal : aliased in out Wl_Signal);
+      Signal : aliased Wl_Signal);
    --  Attaches if and only if the registration is currently detached. Calling
    --  it twice is a no-op rather than a list corruption, so a signal handler
    --  and a teardown path can both call it without coordinating.

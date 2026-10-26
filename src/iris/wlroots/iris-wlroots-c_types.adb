@@ -1,5 +1,3 @@
-with System;
-
 package body Iris.Wlroots.C_Types is
 
    use type System.Address;

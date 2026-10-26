@@ -29,7 +29,7 @@ package body Iris.Wlroots.Listeners is
    end Signal_Init;
 
    procedure Signal_Add
-     (Signal   : aliased in out Wl_Signal;
+     (Signal   : aliased in Wl_Signal;
       Listener : aliased in out Wl_Listener) is
       Tail_Address : constant Opaque_Pointer := Signal.Listener_List.Prev;
       Link_Address : constant Opaque_Pointer := Address_Of (Listener);
@@ -74,7 +74,7 @@ package body Iris.Wlroots.Listeners is
 
    procedure Attach
      (Item   : aliased in out Registration;
-      Signal : aliased in out Wl_Signal) is
+      Signal : aliased Wl_Signal) is
    begin
       if Item.Attached then
          --  Already on a signal. Re-inserting would splice the same link into
