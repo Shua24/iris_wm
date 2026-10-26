@@ -1,0 +1,12 @@
+name = "iris_wm"
+description = "A WLRoots based window-manager written in Ada"
+version = "0.1.0-dev"
+
+authors = ["Shua24"]
+maintainers = ["Shua24 <menyakujou@tutamail.com>"]
+maintainers-logins = ["Shua24"]
+licenses = "GPL-2.0-only"
+website = "https://github.com/Shua24/iris_wm"
+tags = ["windowmanager", "linux", "wayland", "wlroots"]
+
+executables = ["iris_wm"]

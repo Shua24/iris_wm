@@ -1,0 +1,15 @@
+# Build output
+/obj/
+/bin/
+/lib/
+
+# Alire working state; config/ is regenerated on every build and must never be edited by hand
+/alire/
+/config/
+
+# Local plans, notes and research archives (also in .git/info/exclude)
+/.hermes/
+
+# Editor and tooling noise
+*~
+*.swp
