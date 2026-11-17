@@ -124,9 +124,15 @@ jobs:
           # overlay even though the base image is experimental.
           DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
             -t experimental --no-install-recommends \
-            libwlroots-0.20-dev libwayland-dev \
+            libwlroots-0.20-dev libwayland-dev wayland-utils \
             pkg-config build-essential ca-certificates curl unzip git
           pkg-config --modversion wlroots-0.20
+          # wayland-utils supplies wayland-info, which scripts/init-check.sh
+          # uses as the client arm and as the only source of truth for the
+          # published protocol versions. Without it the job fails with
+          # "wayland-info: No such file or directory" (exit 127) and seven
+          # checks report absent globals that are in fact published.
+          command -v wayland-info
 
       - name: Install Alire and the Ada toolchain
         run: |
