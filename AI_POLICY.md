@@ -11,6 +11,7 @@ Here is an AI policy for contributing to the Iris Window Manager project.
 [3. General Prohibitions](#3-general-prohibitions)
 
 [4. What Is Allowed for The SPARK Codebase](#4-what-is-allowed-for-the-spark-codebase)
+
 ---
 
 ### 1. Types of Prohibited Agents
