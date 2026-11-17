@@ -10,13 +10,28 @@ already does well. It is not a safety-critical system and does not pretend to be
 
 ## Status
 
-**Pre-alpha. Nothing is implemented yet.** The repository currently holds the crate manifest,
-the GPR project file, a four-line main, the licence, and this documentation. The staged plan
-lives outside the repository on the maintainer's machine; the first commit is the licensing and
-skeleton groundwork.
+**Pre-alpha. There is no picture yet.** The compositor builds, starts on the X11 (nested) and
+headless backends, publishes its protocol globals, answers a real client, and exits cleanly on
+`SIGTERM`. It draws nothing: the renderer and scene are not wired yet, so a client's buffer is
+accepted and then dropped on the floor. The surface is not up, and `wlr_scene` is untouched.
 
-Do not run Iris expecting a desktop. When it does run, it will be documented here with the
-commands and output that were actually observed.
+What exists, and is exercised by CI on every push:
+
+- The wlroots 0.20 binding, hand-written against the installed headers. Every mirrored struct
+  layout is diffed against a C `offsetof` ground truth, and every listener registration is
+  asserted to remove itself before the object it hangs from is destroyed.
+- Object-graph and teardown ownership in `Iris.Server`, with a regression test for the listener
+  lifetime rule and a control arm that aborts without it.
+- The SPARK-owned core: window geometry and the floating placement policy. The proof gate
+  discharges every check, and asserts on the check table rather than the exit status, because a
+  vacuous `gnatprove` run exits 0.
+- The init sequence and its advertised protocol versions, checked by driving a real
+  `wayland-info` client at a running compositor.
+
+The staged plan lives outside the repository on the maintainer's machine, so the task list here
+will always be behind the tree. Where the two disagree, the tree wins.
+
+Do not run Iris expecting a desktop.
 
 ## What v0 targets
 
@@ -63,8 +78,25 @@ The first build generates `config/`, which is ignored by git and must never be e
 
 ## Running
 
-Not yet possible. When the compositor runs, nested development will use the X11 backend from an
-existing session and headless runs will use `WLR_BACKENDS=headless`.
+`bin/iris_wm` is still a `null` main, so running it produces a compositor that does nothing and
+returns. What actually comes up today is the init probe, and `scripts/init-check.sh` is the way
+in: it starts that probe on a scratch runtime dir, drives a real `wayland-info` client at it,
+asserts the protocol versions it sees, then sends `SIGTERM` and requires a clean exit with no
+coredump.
+
+```
+alr exec -- gprbuild -P tests/binding_probe.gpr    # builds the probe and test mains
+WLR_BACKENDS=headless ./scripts/init-check.sh      # headless, the CI path
+DISPLAY=:1 ./scripts/init-check.sh                 # nested in an X11 session
+```
+
+Nested runs must not have `WAYLAND_DISPLAY` set: `wlr_backend_autocreate` prefers the Wayland
+backend whenever it is, and fails rather than falling back to X11. The script clears it itself
+for the nested path. Never `pkill -x` an Iris binary — the script captures its own PID and kills
+only that, because the developer is normally logged into a live session.
+
+Headless needs no GPU and runs in a container. DRM and multi-output need a VT takeover, so they
+are verified by hand on real hardware and are not covered by CI.
 
 ## Licence
 
